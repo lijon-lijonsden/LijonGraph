@@ -13,7 +13,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using static LijonGraph.ServiceEnums.ServiceEnums;
-using Client = LijonGraph.ExobeHttpServices;
+using Client = LijonGraph.LijonHttpServices;
 
 namespace LijonGraph.Services
 {
@@ -494,7 +494,7 @@ namespace LijonGraph.Services
             string[] expandProperties = null,
             bool sampleCall = false)
         {
-            var thisQuery = "?";
+            var thisQuery = "";
 
             bool queryAdded = false;
 
