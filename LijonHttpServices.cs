@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace LijonGraph
 {
-    internal class LijonHttpServices
+    public class LijonHttpServices
     {
         public class ApiException : Exception
         {

@@ -1,4 +1,4 @@
-﻿using LijonGraph.Models.Reports.CSV;
+﻿using LijonGraph.Models.Reports;
 using Microsoft.Graph;
 using System;
 using System.Collections.Generic;
@@ -11,6 +11,7 @@ namespace LijonGraph.Contracts
 {
     public interface ILijonGraph
     {
+        Task<string> CollectAccessToken(string clientId, string clientSecret, string authority, string tenant, string[] scopes = null);
         Task<IEnumerable<User>> GetUsers(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
         Task<IEnumerable<Device>> GetDevices(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
         Task<IEnumerable<ManagedDevice>> GetManagedDevices(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
@@ -31,5 +32,7 @@ namespace LijonGraph.Contracts
             bool sampleCall = false);
         Task<IEnumerable<SubscribedSku>> GetSubscribedSkus(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
         Task<GraphCsvReports> GetUsageData(string accessToken, DateTime date, CancellationToken cancellationToken);
+        Task<IEnumerable<MobileApp>> GetMobileApps(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
+
     }
 }

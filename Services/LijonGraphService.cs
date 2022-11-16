@@ -1,7 +1,6 @@
 ﻿using LijonGraph.Contracts;
 using LijonGraph.Models;
 using LijonGraph.Models.Beta.Reports;
-using LijonGraph.Models.Reports.CSV;
 using FileHelpers;
 using Microsoft.Graph;
 using Microsoft.Identity.Client;
@@ -14,6 +13,8 @@ using System.Text;
 using System.Threading.Tasks;
 using static LijonGraph.ServiceEnums.ServiceEnums;
 using Client = LijonGraph.LijonHttpServices;
+using LijonGraph.Models.Reports;
+using LijonGraph.Models.Reports.CSV;
 
 namespace LijonGraph.Services
 {
@@ -60,9 +61,6 @@ namespace LijonGraph.Services
             var response = await Client.GetHttp<T>(uri, accesstoken, cancellationToken);
             var stream = await response.Content.ReadAsStreamAsync();
 
-            if (response.IsSuccessStatusCode)
-                return Client.DeserializeJsonFromStream<T>(stream);
-
             int retries = 0;
 
             while (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
@@ -78,6 +76,9 @@ namespace LijonGraph.Services
                 if (response.IsSuccessStatusCode)
                     return Client.DeserializeJsonFromStream<T>(stream);
             }
+
+            if (response.IsSuccessStatusCode)
+                return Client.DeserializeJsonFromStream<T>(stream);
 
             var content = await Client.StreamToStringAsync(stream);
 
@@ -109,13 +110,61 @@ namespace LijonGraph.Services
             {
                 try
                 {
-
                     var skuResponse = await GetPage<OdataSubskribedSku>($"{nextUri}", accesstoken, cancellationToken);
 
                     foreach (var users in skuResponse?.SubScribedSkus)
                         model.Add(users);
 
                     nextUri = collectAll == false ? null : skuResponse?.PagingUrl;
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"{ex.StatusCode}");
+                    }
+                }
+
+            } while (string.IsNullOrEmpty(nextUri) == false);
+
+            return model;
+        }
+
+        public async Task<IEnumerable<MobileApp>> GetMobileApps(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null)
+        {
+            if (string.IsNullOrEmpty(accesstoken))
+                throw new ArgumentNullException();
+
+            var model = new List<MobileApp>();
+
+            string nextUri = $"{BaseUrl}/deviceAppManagement/mobileApps{query}";
+
+            if (query?.Contains("top=") == false && collectAll == true)
+            {
+                if (query == "")
+                    nextUri = $"{nextUri}?$top=999";
+                else
+                    nextUri = $"{nextUri} &$top=999";
+            }
+
+            do
+            {
+                try
+                {
+
+                    var mobileAppsResponse = await GetPage<ODataMobileApp>($"{nextUri}", accesstoken, cancellationToken);
+
+                    foreach (var users in mobileAppsResponse?.MobileApps)
+                        model.Add(users);
+
+                    nextUri = collectAll == false ? null : mobileAppsResponse?.PagingUrl;
                 }
                 catch (ApiException ex)
                 {
@@ -494,7 +543,7 @@ namespace LijonGraph.Services
             string[] expandProperties = null,
             bool sampleCall = false)
         {
-            var thisQuery = "";
+            var thisQuery = "?";
 
             bool queryAdded = false;
 
@@ -517,9 +566,11 @@ namespace LijonGraph.Services
             if (selectProperties != null)
             {
                 if (!queryAdded)
-                    thisQuery = $"{thisQuery}?$select=";
+                    thisQuery = $"{thisQuery}$select=";
                 else
-                    thisQuery = $"{thisQuery} &$select=";
+                    thisQuery = $"{thisQuery}&$select=";
+
+                queryAdded = true;
 
                 for (int i = 0; i < selectProperties.Length; i++)
                 {
@@ -533,9 +584,9 @@ namespace LijonGraph.Services
             if (expandProperties != null)
             {
                 if (!queryAdded)
-                    thisQuery = $"{thisQuery}?$expand=";
+                    thisQuery = $"{thisQuery}$expand=";
                 else
-                    thisQuery = $"{thisQuery} &$expand=";
+                    thisQuery = $"{thisQuery}&$expand=";
 
                 for (int i = 0; i < expandProperties.Length; i++)
                 {
@@ -549,9 +600,9 @@ namespace LijonGraph.Services
             if (sampleCall)
             {
                 if (!queryAdded)
-                    thisQuery = $"{thisQuery}?$top=5";
+                    thisQuery = $"{thisQuery}$top=5";
                 else
-                    thisQuery = $"{thisQuery} &$top=5";
+                    thisQuery = $"{thisQuery}&$top=5";
 
                 collectAll = false;
             }
@@ -652,11 +703,11 @@ namespace LijonGraph.Services
             //var teamsBeta = await GetTeamsReportBeta<TeamsReportData>(accessToken, DateTime.UtcNow.AddDays(-5), cancellationToken);
 
             var teamsActivityUserDetail = await GetReport<Models.Reports.CSV.TeamsUserActivityUserDetail>(accessToken, date, cancellationToken);
-            var teamsDeviceUsageUserDetail = await GetReport<Models.Reports.CSV.TeamsDeviceUsageUserDetail>(accessToken, date, cancellationToken);
-            var oneDriveActivityUserDetail = await GetReport<Models.Reports.CSV.OneDriveActivityUserDetail>(accessToken, date, cancellationToken);
-            var emailActivityUserDetail = await GetReport<Models.Reports.CSV.EmailActivityUserDetail>(accessToken, date, cancellationToken);
-            var yeammerActivityUserDetail = await GetReport<Models.Reports.CSV.YammerActivityUserDetail>(accessToken, date, cancellationToken);
-            var officeActivationUserDetail = await GetReport<Models.Reports.CSV.Office365ActivationsUserDetail>(accessToken, new DateTime(), cancellationToken);
+            var teamsDeviceUsageUserDetail = await GetReport<TeamsDeviceUsageUserDetail>(accessToken, date, cancellationToken);
+            var oneDriveActivityUserDetail = await GetReport<OneDriveActivityUserDetail>(accessToken, date, cancellationToken);
+            var emailActivityUserDetail = await GetReport<EmailActivityUserDetail>(accessToken, date, cancellationToken);
+            var yeammerActivityUserDetail = await GetReport<YammerActivityUserDetail>(accessToken, date, cancellationToken);
+            var officeActivationUserDetail = await GetReport<Office365ActivationsUserDetail>(accessToken, new DateTime(), cancellationToken);
 
             GraphCsvReports model = new GraphCsvReports();
 
