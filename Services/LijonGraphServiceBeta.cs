@@ -249,9 +249,6 @@ namespace LijonGraph.Services
         {
             var response = await Client.GetHttp<T>(uri, accesstoken, cancellationToken);
 
-            //NOTE TEMP:
-            var content2 = await response.Content.ReadAsStringAsync();
-
             var stream = await response.Content.ReadAsStreamAsync();
 
             if (response.IsSuccessStatusCode)
