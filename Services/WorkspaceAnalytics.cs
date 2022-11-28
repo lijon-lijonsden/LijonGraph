@@ -22,7 +22,7 @@ namespace LijonGraph.Services
             return credential;
         }
 
-        public async Task<LogsQueryResult> GetModelFromAnalytics(ClientSecretCredential credential, string workspaceId, string query, QueryTimeRange? timeRange = null)
+        public async Task<Azure.Response<IReadOnlyList<T>>> GetModelFromAnalytics<T>(ClientSecretCredential credential, string workspaceId, string query, QueryTimeRange? timeRange = null)
         {
             var client = new LogsQueryClient(credential);
 
@@ -35,12 +35,12 @@ namespace LijonGraph.Services
             if (workspaceId == null)
                 throw new ArgumentNullException("workspaceId needed");
 
-            Response<LogsQueryResult> response = await client.QueryWorkspaceAsync(
-                   workspaceId,
-                   query,
-                   (QueryTimeRange)timeRange);
+            var response = await client.QueryWorkspaceAsync<T>(
+                workspaceId,
+                query,
+                (QueryTimeRange)timeRange);
 
-            return response; 
+            return response;
         }
-	}
+    }
 }

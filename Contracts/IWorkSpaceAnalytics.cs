@@ -12,6 +12,6 @@ namespace LijonGraph.Contracts
     public interface IWorkSpaceanalytics
     {
         Task<ClientSecretCredential> GetAccessToken(string tenantId, string clientId, string clientSecret);
-        Task<LogsQueryResult> GetModelFromAnalytics(ClientSecretCredential credential, string workspaceId, string query, QueryTimeRange? timeRange = null);
+        Task<Azure.Response<IReadOnlyList<T>>> GetModelFromAnalytics<T>(ClientSecretCredential credential, string workspaceId, string query, QueryTimeRange? timeRange = null);
     }
 }
