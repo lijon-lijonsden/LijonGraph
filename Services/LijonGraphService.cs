@@ -15,6 +15,7 @@ using static LijonGraph.ServiceEnums.ServiceEnums;
 using Client = LijonGraph.LijonHttpServices;
 using LijonGraph.Models.Reports;
 using LijonGraph.Models.Reports.CSV;
+using Newtonsoft.Json;
 
 namespace LijonGraph.Services
 {
@@ -87,6 +88,230 @@ namespace LijonGraph.Services
                 StatusCode = (int)response.StatusCode,
                 Content = content
             };
+        }
+
+        private static async Task<T> GetPageContent<T>(string uri, string accesstoken, CancellationToken cancellationToken, int maxAmountOftries = 5)
+        {
+            var response = await Client.GetHttp<T>(uri, accesstoken, cancellationToken);
+            var content = await response.Content.ReadAsStringAsync();
+
+            var test = JsonConvert.DeserializeObject<T>(content);
+
+            int retries = 0;
+
+            while (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                ++retries;
+
+                var retryAfter = response.Headers?.RetryAfter?.Delta;
+                if (retryAfter == null)
+                    retryAfter = new TimeSpan(0, 0, 100);
+
+                Thread.Sleep((int)retryAfter.Value.TotalMilliseconds);
+
+                if (response.IsSuccessStatusCode)
+                    return JsonConvert.DeserializeObject<T>(content);
+            }
+
+            if (response.IsSuccessStatusCode)
+                return JsonConvert.DeserializeObject<T>(content);
+
+            throw new ApiException
+            {
+                StatusCode = (int)response.StatusCode,
+                Content = content
+            };
+        }
+
+
+        public async Task<OnlineMeeting> GetOnlineMeeting(string accesstoken, string meetingOrganizerId, string joinWebUrl, CancellationToken cancellationToken, bool collectAll = true, string query = null)
+        {
+            if (string.IsNullOrEmpty(accesstoken))
+                throw new ArgumentNullException();
+
+            var model = new OnlineMeeting();
+
+            string nextUri = $"{BaseUrl}/users/{meetingOrganizerId}/onlineMeetings?$filter=JoinWebUrl%20eq%20'{joinWebUrl}'";
+
+            try
+            {
+                var onlineMeetingsResponse = await GetPageContent<OdataOnlineMeeting>($"{nextUri}", accesstoken, cancellationToken);
+                model = onlineMeetingsResponse.OnlineMeetings?.First(); 
+            }
+            catch (ApiException ex)
+            {
+                switch (ex.StatusCode)
+                {
+                    case 404:
+                        return null;
+                    case 401:
+                        return null;
+                    case 403:
+                        return null;
+                    default:
+                        return null;
+                }
+            }
+
+            return model; 
+        }
+
+        public async Task<IEnumerable<AttendanceRecord>> GetAttendanceRecords(string accesstoken, string meetingOrganizerId, string onlineMeetingId, CancellationToken cancellationToken, bool collectAll = true, string query = null)
+        {
+            if (string.IsNullOrEmpty(accesstoken))
+                throw new ArgumentNullException();
+
+
+            string nextUri = $"{BaseUrl}/users/{meetingOrganizerId}/onlineMeetings/{onlineMeetingId}/attendanceReports";
+
+            var attendancyReportsResponse = await GetPage<OdataAttendanceReports>($"{nextUri}", accesstoken, cancellationToken);
+
+            if (attendancyReportsResponse?.Reports == null || attendancyReportsResponse?.Reports.Count() == 0)
+                return null;
+
+            var firstReport = attendancyReportsResponse.Reports[0];
+            var lastReport = attendancyReportsResponse.Reports[attendancyReportsResponse.Reports.Count() - 1];
+
+            nextUri = $"{BaseUrl}/users/{meetingOrganizerId}/onlineMeetings/{onlineMeetingId}/attendanceReports/{firstReport.id}/attendanceRecords{query}";
+
+            var model = new List<AttendanceRecord>();
+
+
+            if (query?.Contains("top=") == false && collectAll == true)
+            {
+                if (query == "")
+                    nextUri = $"{nextUri}?$top=999";
+                else
+                    nextUri = $"{nextUri}&$top=999";
+            }
+
+            do
+            {
+                try
+                {
+                    var attendanceRecords = await GetPage<ODataAttendanceRecord>($"{nextUri}", accesstoken, cancellationToken);
+
+                    foreach (var record in attendanceRecords?.Records)
+                        model.Add(record);
+
+                    nextUri = collectAll == false ? null : attendanceRecords?.PagingUrl;
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"{ex.StatusCode}");
+                    }
+                }
+
+            } while (string.IsNullOrEmpty(nextUri) == false);
+
+            return model;
+
+        }
+
+        public async Task<IEnumerable<Event>> GetEventsForPrincipal(string accesstoken, string principalId, CancellationToken cancellationToken, bool collectAll = true, string query = null)
+        {
+            if (string.IsNullOrEmpty(accesstoken))
+                throw new ArgumentNullException();
+
+            var model = new List<Event>();
+
+            string nextUri = $"{BaseUrl}/users/{principalId}/calendar/calendarView{query}";
+            //string nextUri = $"{BaseUrl}/users/{principalId}/calendar/events";
+
+            if (query?.Contains("top=") == false && collectAll == true)
+            {
+                if (query == "")
+                    nextUri = $"{nextUri}?$top=999";
+                else
+                    nextUri = $"{nextUri}&$top=999";
+            }
+
+            do
+            {
+                try
+                {
+                    var eventsResponse = await GetPage<OdataEvents>($"{nextUri}", accesstoken, cancellationToken);
+
+                    foreach (var users in eventsResponse?.Events)
+                        model.Add(users);
+
+                    nextUri = collectAll == false ? null : eventsResponse?.PagingUrl;
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"{ex.StatusCode}");
+                    }
+                }
+
+            } while (string.IsNullOrEmpty(nextUri) == false);
+
+            return model;
+        }
+
+        public async Task<IEnumerable<Room>> GetRooms(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null)
+        {
+            if (string.IsNullOrEmpty(accesstoken))
+                throw new ArgumentNullException();
+
+            var model = new List<Room>();
+
+            string nextUri = $"{BaseUrl}/places/microsoft.graph.room{query}";
+
+            if (query?.Contains("top=") == false && collectAll == true)
+            {
+                if (query == "")
+                    nextUri = $"{nextUri}?$top=999";
+                else
+                    nextUri = $"{nextUri} &$top=999";
+            }
+
+            do
+            {
+                try
+                {
+                    var roomResponse = await GetPage<ODataRooms>($"{nextUri}", accesstoken, cancellationToken);
+
+                    foreach (var users in roomResponse?.Rooms)
+                        model.Add(users);
+
+                    nextUri = collectAll == false ? null : roomResponse?.PagingUrl;
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"{ex.StatusCode}");
+                    }
+                }
+
+            } while (string.IsNullOrEmpty(nextUri) == false);
+
+            return model;
         }
 
         public async Task<IEnumerable<SubscribedSku>> GetSubscribedSkus(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null)
@@ -607,6 +832,7 @@ namespace LijonGraph.Services
                 collectAll = false;
             }
 
+
             var result = await GetUsers(accesstoken, cancellationToken, query: thisQuery, collectAll: collectAll);
 
             if (result == null)
@@ -689,10 +915,8 @@ namespace LijonGraph.Services
             var returnModel = new List<Device>();
             returnModel = result.ToList();
 
-
             return returnModel;
         }
-
 
         public async Task<GraphCsvReports> GetUsageData(string accessToken, DateTime date, CancellationToken cancellationToken)
         {
@@ -719,6 +943,11 @@ namespace LijonGraph.Services
             model.Office365ActivationsUserDetail = officeActivationUserDetail;
 
             return model;
+        }
+
+        public Task<IEnumerable<MeetingAttendanceReport>> GetAttendanceReports(string azureToken, string roomId, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 }

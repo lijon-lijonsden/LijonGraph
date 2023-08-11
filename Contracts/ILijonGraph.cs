@@ -12,6 +12,11 @@ namespace LijonGraph.Contracts
 {
     public interface ILijonGraph
     {
+        Task<IEnumerable<Microsoft.Graph.MeetingAttendanceReport>> GetAttendanceReports(string azureToken, string roomId, CancellationToken cancellationToken);
+        Task<OnlineMeeting> GetOnlineMeeting(string accesstoken, string meetingOrganizerId, string joinWebUrl, CancellationToken cancellationToken, bool collectAll = true, string query = null);
+        Task<IEnumerable<AttendanceRecord>> GetAttendanceRecords(string accesstoken, string meetingOrganizerId, string onlineMeetingId, CancellationToken cancellationToken, bool collectAll = true, string query = null);
+        Task<IEnumerable<Event>> GetEventsForPrincipal(string accesstoken, string principalId, CancellationToken cancellationToken, bool collectAll = true, string query = null);
+        Task<IEnumerable<Room>> GetRooms(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
         Task<string> CollectAccessToken(string clientId, string clientSecret, string authority, string tenant, string[] scopes = null);
         Task<IEnumerable<User>> GetUsers(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);
         Task<IEnumerable<Device>> GetDevices(string accesstoken, CancellationToken cancellationToken, bool collectAll = true, string query = null);

@@ -16,6 +16,8 @@ namespace LijonGraph.Contracts
 {
     public interface ILijonGraphBeta
     {
+        Task<IEnumerable<TeamworkDevice>> GetTeamworkDevices(string accessToken, CancellationToken cancellationToken, string query = null, bool collectAll = true);
+        Task<IEnumerable<(string id, TeamworkDeviceHealth teamworkDeviceHealth)>> GetTeamworkDeviceHealths(string accessToken, string[] TeamworkDeviceIds, CancellationToken cancellationToken, string query = null, bool collectAll = true);
         Task<RoleScopeTags> GetRoleScopeTags(string accessToken, CancellationToken cancellationToken);
         Task<List<LijonGraph.Models.Beta.Device>> GetDeviceAndOwners(string accessToken, CancellationToken cancellationToken);
         Task<List<LijonGraph.Models.Beta.ManagedDevicesBetaExpanded>> GetManagedDeviceRoleTag(string accesstoken, CancellationToken cancellationToken, string[] ids);

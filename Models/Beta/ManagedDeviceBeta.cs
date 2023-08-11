@@ -11,6 +11,14 @@ namespace LijonGraph.Models.Beta
         public string odatacontext { get; set; }
         public List<string> roleScopeTagIds { get; set; }
         public string id { get; set; }
+        public string deviceHealthAttestationState { get; set; }
+        public string totalStorageSpaceInBytes { get; set; }
+        public string freeStorageSpaceInBytes { get; set; }
+        public string udid { get; set; }
+        public string iccid { get; set; }
+        public string ethernetMacAddress { get; set; }
+        public string physicalMemoryInBytes { get; set; }
+        public string processorArchitecture { get; set; }
         public string userPrincipalName { get; set; }
         public string operatingSystem { get; set; }
         public string deviceName { get; set; }

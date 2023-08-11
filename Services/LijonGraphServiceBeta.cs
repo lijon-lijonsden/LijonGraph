@@ -141,6 +141,94 @@ namespace LijonGraph.Services
             return model;
         }
 
+        public async Task<IEnumerable<(string id, TeamworkDeviceHealth teamworkDeviceHealth)>> GetTeamworkDeviceHealths(string accessToken, string[] TeamworkDeviceIds, CancellationToken cancellationToken, string query = null, bool collectAll = true)
+        {
+            if (string.IsNullOrEmpty(accessToken))
+                throw new ArgumentNullException();
+
+            var model = new List<(string id, TeamworkDeviceHealth teamworkDeviceHealth)>();
+
+            foreach (var item in TeamworkDeviceIds)
+            {
+                var thisId = item;
+
+                string nextUri = $"{BaseUrl}/teamwork/devices/{item}/health";
+
+                try
+                {
+
+                    var teamworkDeviceHealthResponse = await GetPage<Models.Beta.TeamworkDeviceHealth>($"{nextUri}", accessToken, cancellationToken);
+
+                    model.Add((thisId, teamworkDeviceHealthResponse));
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"Service returnd status {ex.StatusCode}");
+                    }
+                }
+            }
+
+            return model;
+        }
+
+        public async Task<IEnumerable<TeamworkDevice>> GetTeamworkDevices(string accessToken, CancellationToken cancellationToken, string query = null, bool collectAll = true)
+        {
+            if (string.IsNullOrEmpty(accessToken))
+                throw new ArgumentNullException();
+
+            var model = new List<Models.Beta.TeamworkDevice>();
+
+            string nextUri = $"{BaseUrl}/teamwork/devices{query}";
+
+            if (query?.Contains("top=") == false && collectAll == true)
+            {
+                if (query == "")
+                    nextUri = $"{nextUri}?$top=999";
+                else
+                    nextUri = $"{nextUri} &$top=999";
+            }
+
+            do
+            {
+                try
+                {
+
+                    var teamWorkDeviceResponse = await GetPage<Models.Beta.TeamworkDeviceRoot>($"{nextUri}", accessToken, cancellationToken);
+
+                    foreach (var devices in teamWorkDeviceResponse.TeamworkDevices)
+                        model.Add(devices);
+
+                    nextUri = collectAll == false ? null : teamWorkDeviceResponse?.PagingUrl;
+                }
+                catch (ApiException ex)
+                {
+                    switch (ex.StatusCode)
+                    {
+                        case 404:
+                            throw new HttpRequestException($"Resource not found");
+                        case 401:
+                            throw new UnauthorizedAccessException($"Client is not authorized for this request");
+                        case 403:
+                            throw new UnauthorizedAccessException($"Client is not allowed this resource");
+                        default:
+                            throw new Exception($"Service returnd status {ex.StatusCode}");
+                    }
+                }
+
+            } while (string.IsNullOrEmpty(nextUri) == false);
+
+            return model;
+        }
+
         public async Task<List<LijonGraph.Models.Beta.Device>> GetDeviceAndOwners(string accessToken, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(accessToken))
@@ -315,5 +403,6 @@ namespace LijonGraph.Services
 
             return model;
         }
+
     }
 }
